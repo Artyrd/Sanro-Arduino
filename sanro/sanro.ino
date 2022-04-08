@@ -25,13 +25,15 @@
 
 // Forced sampling frequency
 #define FORCED_FREQ 1000
+long int cycleTime = 1000000 / FORCED_FREQ;
 
 #include <limits.h>
 #include <Keyboard.h>
 #include "cache.h"
 
 #if MODE_JIRO
-#define HEAVY_THRES LONG_MAX
+  // disable heavy hits
+  #define HEAVY_THRES LONG_MAX
 #endif
 
 unsigned long int lastTime;
@@ -45,9 +47,12 @@ Cache <long int, POWER_CACHE_LENGTH> powerCache [CHANNELS];
 
 bool triggered [CHANNELS];
 
-int pins[] = {A0, A1, A2, A3};  // L don, R don, L kat, R kat
-char lightKeys[] = {'g', 'h', 'f', 'j'};
-char heavyKeys[] = {'t', 'y', 'r', 'u'};
+// int pins[] = {A0, A1, A2, A3};  // L don, R don, L kat, R kat
+// char lightKeys[] = {'g', 'h', 'f', 'j'};
+// char heavyKeys[] = {'t', 'y', 'r', 'u'};
+int pins[] = {A0, A1, A2, A3};  // L ka, L don, R don, R ka
+char lightKeys[] = {'e', 'f', 'j', 'i'};
+char heavyKeys[] = {'r', 'g', 'h', 'u'};
 
 void setup() {
   Serial.begin (9600);
@@ -87,6 +92,7 @@ void loop() {
       for (short int j = 0; j < POWER_CACHE_LENGTH - 1; j++) {
         if (powerCache [i].get (j - 1) >= powerCache [i].get (j)) {
           break;
+        // heavy hits don't register in taiko jiro mode
         } else if (powerCache [i].get (1) >= HEAVY_THRES) {
           triggered [i] = true;
           Keyboard.print (heavyKeys [i]);
@@ -114,10 +120,10 @@ void loop() {
     Serial.println ("");
   #endif
 
-// Force the sample frequency to be less than 1000Hz
+  // Force the sample frequency to be less than 1000Hz
   unsigned int frameTime = micros () - lastTime;
-  if (frameTime < FORCED_FREQ) {
-    delayMicroseconds (FORCED_FREQ - frameTime);
+  if (frameTime < cycleTime) {
+    delayMicroseconds (cycleTime - frameTime);
   } else {
     // Performance bottleneck;
     Serial.print ("Exception: forced frequency is too high for the microprocessor to catch up.");
