@@ -97,30 +97,30 @@ void loop() {
       }
     }
     
-#if MODE_DEBUG
-    Serial.print (power [i]);
-    Serial.print ("\t");
-#endif
+    #if MODE_DEBUG
+        Serial.print (power [i]);
+        Serial.print ("\t");
+    #endif
 
-// End of each channel
+    // End of each channel
   }
 
-#if MODE_DEBUG
-  Serial.print (50000);
-  Serial.print ("\t");
-  Serial.print (0);
-  Serial.print ("\t");
+  #if MODE_DEBUG
+    Serial.print (50000);
+    Serial.print ("\t");
+    Serial.print (0);
+    Serial.print ("\t");
 
-  Serial.println ("");
-#endif
+    Serial.println ("");
+  #endif
 
 // Force the sample frequency to be less than 1000Hz
   unsigned int frameTime = micros () - lastTime;
-  lastTime = micros ();
   if (frameTime < FORCED_FREQ) {
     delayMicroseconds (FORCED_FREQ - frameTime);
   } else {
     // Performance bottleneck;
     Serial.print ("Exception: forced frequency is too high for the microprocessor to catch up.");
   }
+  lastTime = micros ();
 }
