@@ -11,7 +11,7 @@
 // Compatibility with Taiko Jiro
 #define MODE_JIRO 1
 
-#define MODE_DEBUG 0
+#define MODE_DEBUG 1
 
 #define CHANNELS 4
 
@@ -20,11 +20,12 @@
 #define POWER_CACHE_LENGTH 3
 
 // Light and heacy hit thresholds
+//#define LIGHT_THRES 5000
 #define LIGHT_THRES 5000
 #define HEAVY_THRES 20000
 
 // Forced sampling frequency
-#define FORCED_FREQ 1000
+#define FORCED_FREQ 500
 long int cycleTime = 1000000 / FORCED_FREQ;
 
 #include <limits.h>
@@ -43,6 +44,7 @@ int lastChannelSample [CHANNELS];
 Cache <int, SAMPLE_CACHE_LENGTH> sampleCache [CHANNELS];
 
 long int power [CHANNELS];
+long int lastPower [CHANNELS];
 Cache <long int, POWER_CACHE_LENGTH> powerCache [CHANNELS];
 
 bool triggered [CHANNELS];
@@ -60,6 +62,7 @@ void setup() {
   analogReference (DEFAULT);
   for (short int i = 0; i < CHANNELS; i++) {
     power [i] = 0;
+    lastPower [i] = 0;
     lastChannelSample [i] = 0;
     triggered [i] = false;
   }
@@ -78,10 +81,13 @@ void loop() {
     power [i] -= tempInt * tempInt;
     tempInt = sampleCache [i].get ();
     power [i] += tempInt * tempInt;
+    //if (power [i] < LIGHT_THRES || power[i] < lastPower[i]) {
     if (power [i] < LIGHT_THRES) {
       power [i] = 0;
     }
-    
+    // if power starts decreasing, can re-check for another hit (incase of roll)
+    // lastPower[i] = power[i];
+
     powerCache [i].put (power [i]);
     lastChannelSample [i] = channelSample [i];
     if (powerCache [i].get (1) == 0) {
@@ -104,20 +110,23 @@ void loop() {
     }
     
     #if MODE_DEBUG
-        Serial.print (power [i]);
-        Serial.print ("\t");
+//        Serial.print (power [i]);
+//        Serial.print ("\t");
     #endif
 
     // End of each channel
   }
 
   #if MODE_DEBUG
-    Serial.print (50000);
-    Serial.print ("\t");
-    Serial.print (0);
-    Serial.print ("\t");
-
-    Serial.println ("");
+//    Serial.print (50000);
+//    Serial.print ("\t");
+//    Serial.print (0);
+//    Serial.print ("\t");
+//    Serial.println ("");
+    if (power[0] || power[1] || power[2] || power[3]) {
+      Serial.println(String(power[0]) + "\t" + String(power[1]) + "\t" + String(power[2]) + "\t" + String(power[3]));
+    }
+      
   #endif
 
   // Force the sample frequency to be less than 1000Hz
@@ -126,7 +135,9 @@ void loop() {
     delayMicroseconds (cycleTime - frameTime);
   } else {
     // Performance bottleneck;
-    Serial.print ("Exception: forced frequency is too high for the microprocessor to catch up.");
+    Serial.println ("Exception: forced frequency is too high for the microprocessor to catch up.");
+    Serial.println ("cycle time:" + String(cycleTime));
+    Serial.println(frameTime);
   }
   lastTime = micros ();
 }
