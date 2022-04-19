@@ -38,7 +38,7 @@ void Cache <T, L>::put (T value) {
 
 template <class T, int L>
 T Cache <T, L>::get (int offset) const {
-   int index = (current_ - 1 + offset) % L;
+   int index = (current_ + L + offset) % L;
    return data_ [index];
 }
 
