@@ -11,6 +11,8 @@
 // Compatibility with Taiko Jiro
 #define MODE_JIRO 1
 
+#define ENABLE_NS_JOYSTICK 1 // 1 - Nintendo Switch compatability, 0 otherwise
+
 #define MODE_DEBUG 0
 
 #define CHANNELS 4
@@ -28,6 +30,7 @@
 #else
   #define HEAVY_THRES 20000
 #endif
+
 long int thresh[4] = {5000, 5000, 5000, 5000};
 
 // Forced sampling frequency
@@ -38,8 +41,6 @@ long int cycleTime = 1000000 / FORCED_FREQ;
 #include <Keyboard.h>
 #include "cache.h"
 
-
-
 unsigned long int lastTime;
 
 int channelSample [CHANNELS];
@@ -47,7 +48,6 @@ int lastChannelSample [CHANNELS];
 Cache <int, SAMPLE_CACHE_LENGTH> sampleCache [CHANNELS];
 
 long int power [CHANNELS];
-long int lastPower [CHANNELS];
 Cache <long int, POWER_CACHE_LENGTH> powerCache [CHANNELS];
 
 bool triggered [CHANNELS];
@@ -60,6 +60,15 @@ bool printed[CHANNELS];
 int pins[] = {A0, A3, A1, A2};  // L ka, R ka, L don, R don
 char lightKeys[] = {'e', 'i', 'f', 'j'}; // L ka, R ka, L don, R don 
 char heavyKeys[] = {'r', 'g', 'h', 'u'};
+
+
+bool down[4] = {false, false, false, false};
+
+#ifdef ENABLE_NS_JOYSTICK
+  #include "Joystick.h"
+  const int sensor_button[4] = {SWITCH_BTN_ZL, SWITCH_BTN_LCLICK, SWITCH_BTN_RCLICK, SWITCH_BTN_ZR};
+  uint8_t down_count[4] = {0, 0, 0, 0};
+#endif
 
 bool newlinePrinted = false;
 
@@ -74,6 +83,12 @@ void setup() {
     triggered [i] = false;
   }
   lastTime = 0;
+  /*
+  #ifdef ENABLE_NS_JOYSTICK
+    for (int i = 0; i < 8; ++i) pinMode(i, INPUT_PULLUP);
+    for (int i = 0; i < 4; ++i) {  digitalWrite(led_pin[i], HIGH); pinMode(led_pin[i], OUTPUT); }
+  #endif
+  */
 }
 
 void loop() {
@@ -88,7 +103,6 @@ void loop() {
     power [i] -= tempInt * tempInt;
     tempInt = sampleCache[i].get (); // get the newest reading
     power [i] += tempInt * tempInt;
-    //if (power [i] < LIGHT_THRES || power[i] < lastPower[i]) {
     if (power [i] < LIGHT_THRES) {
       power [i] = 0;
     }
@@ -120,6 +134,12 @@ void loop() {
           triggered [i] = true;
           Keyboard.print (lightKeys[i]);
           printed[i] = true;
+
+          #ifdef ENABLE_NS_JOYSTICK
+            bool state = (down_count[i] & 1);
+            Joystick.Button |= (state ? sensor_button[i] : SWITCH_BTN_NONE);
+          #endif
+
           break;
         }
       }
@@ -132,6 +152,11 @@ void loop() {
 
     // End of each channel
   }
+  
+  #ifdef ENABLE_NS_JOYSTICK
+    Joystick.sendState();
+    Joystick.Button = SWITCH_BTN_NONE;
+  #endif
 
   #if MODE_DEBUG
 //    Serial.print (50000);
