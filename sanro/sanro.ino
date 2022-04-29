@@ -11,7 +11,7 @@
 // Compatibility with Taiko Jiro
 #define MODE_JIRO 1
 
-#define ENABLE_NS_JOYSTICK 1 // 1 - Nintendo Switch compatability, 0 otherwise
+#define ENABLE_NS_JOYSTICK // - Nintendo Switch compatability, 0 otherwise
 
 #define MODE_DEBUG 0
 
@@ -47,14 +47,18 @@ int channelSample [CHANNELS];
 int lastChannelSample [CHANNELS];
 Cache <int, SAMPLE_CACHE_LENGTH> sampleCache [CHANNELS];
 
+long int frame = 0;
+int frame_cycle = 10;
+
 long int power [CHANNELS];
 Cache <long int, POWER_CACHE_LENGTH> powerCache [CHANNELS];
 
 bool triggered [CHANNELS];
+bool ns_inputted = false;
 
 bool printed[CHANNELS];
 
-// int pins[] = {A0, A1, A2, A3};  // L don, R don, L kat, R kat
+// int pins[] = {A0, A1, A2, A3};  // L kat, R kat, L don, R don
 // char lightKeys[] = {'g', 'h', 'f', 'j'};
 // char heavyKeys[] = {'t', 'y', 'r', 'u'};
 int pins[] = {A0, A3, A1, A2};  // L ka, R ka, L don, R don
@@ -66,7 +70,13 @@ bool down[4] = {false, false, false, false};
 
 #ifdef ENABLE_NS_JOYSTICK
   #include "Joystick.h"
-  const int sensor_button[4] = {SWITCH_BTN_ZL, SWITCH_BTN_LCLICK, SWITCH_BTN_RCLICK, SWITCH_BTN_ZR};
+  //const int sensor_button[4] = {SWITCH_BTN_ZL, SWITCH_BTN_ZR, SWITCH_BTN_B, SWITCH_BTN_A};
+  //   taiko force layout:   <             A
+  //                            >      B
+  //
+  //                               L ka, R ka, L don, R don 
+  const int sensor_button[4] = {SWITCH_BTN_NONE, SWITCH_BTN_A, SWITCH_BTN_NONE, SWITCH_BTN_B};
+  const int sensor_hat[4] = {SWITCH_HAT_L, 0, SWITCH_HAT_R, 0};
   uint8_t down_count[4] = {0, 0, 0, 0};
 #endif
 
@@ -76,19 +86,18 @@ void setup() {
   Serial.begin (9600);
   Keyboard.begin ();
   analogReference (DEFAULT);
+  //analogSwitchPin(pins[0]);
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, LOW);
   for (short int i = 0; i < CHANNELS; i++) {
     power [i] = 0;
-    lastPower [i] = 0;
     lastChannelSample [i] = 0;
     triggered [i] = false;
   }
   lastTime = 0;
-  /*
   #ifdef ENABLE_NS_JOYSTICK
     for (int i = 0; i < 8; ++i) pinMode(i, INPUT_PULLUP);
-    for (int i = 0; i < 4; ++i) {  digitalWrite(led_pin[i], HIGH); pinMode(led_pin[i], OUTPUT); }
   #endif
-  */
 }
 
 void loop() {
@@ -132,12 +141,13 @@ void loop() {
             break;
           }
           triggered [i] = true;
-          Keyboard.print (lightKeys[i]);
+          //Keyboard.print (lightKeys[i]);
           printed[i] = true;
-
+          
           #ifdef ENABLE_NS_JOYSTICK
-            bool state = (down_count[i] & 1);
-            Joystick.Button |= (state ? sensor_button[i] : SWITCH_BTN_NONE);
+            if (down_count[i] <= 2)
+              //down_count[i] += 2;
+              down_count[i] += 1;
           #endif
 
           break;
@@ -152,10 +162,66 @@ void loop() {
 
     // End of each channel
   }
-  
+
   #ifdef ENABLE_NS_JOYSTICK
-    Joystick.sendState();
-    Joystick.Button = SWITCH_BTN_NONE;
+  frame++;
+  if (frame > frame_cycle) {
+    if (down_count[0] || down_count[1] || down_count[2] || down_count[3]) {
+      frame = 0;
+      Serial.print(String(down_count[0]) + " " + String(down_count[1]) + " " + String(down_count[2]) + " " + String(down_count[3]) + "\n");
+      Joystick.HAT = 0;
+      for (int i = 0; i < 4; i++) {
+        bool state = (down_count[i] & 1);
+        //bool state = (bool) down_count[i];
+        Joystick.Button |= (state ? sensor_button[i] : SWITCH_BTN_NONE);
+        Joystick.HAT |= (state ? sensor_hat[i] : 0);
+        down_count[i] -= (bool)down_count[i];
+        if (state) break;
+      }
+      if (Joystick.HAT == 0) { 
+        Joystick.HAT = SWITCH_HAT_CENTER;
+      }
+      Joystick.sendState();
+      //sends++;
+      Serial.print("Button:" + (String)Joystick.Button + " HAT:" + (String)Joystick.HAT +"\n");
+      //Serial.print(String(down_count[0]) + " " + String(down_count[1]) + " " + String(down_count[2]) + " " + String(down_count[3]) + "\n");
+      
+      Joystick.Button = SWITCH_BTN_NONE;
+      Joystick.HAT = SWITCH_HAT_CENTER;;
+    } else if (frame > frame_cycle * 4) {
+      frame = 0;
+      Joystick.sendState();
+    }
+    /*
+    if (down_count[0] || down_count[1] || down_count[2] || down_count[3]) {
+      for (int i = 0; i < 4; i++) {
+        //bool state = (down_count[i] & 1);
+        bool state = (bool) down_count[i];
+        Joystick.Button |= (state ? sensor_button[i] : SWITCH_BTN_NONE);
+        Joystick.HAT |= (state ? sensor_hat[i] : 0);
+        down_count[i] -= !!down_count[i];
+      }
+      if (Joystick.HAT == 0) { 
+        Joystick.HAT = -1;
+      }
+      Joystick.sendState();
+      Joystick.Button = SWITCH_BTN_NONE;
+      Joystick.HAT = 0;
+    }
+    */
+
+    /*
+    if (ns_inputted) {
+      Joystick.sendState();
+      Joystick.Button = SWITCH_BTN_NONE;
+      ns_inputted = false;
+    } else {
+      Joystick.Button = SWITCH_BTN_NONE;
+      Joystick.sendState();
+      ns_inputted = false;
+    }
+    */
+  }
   #endif
 
   #if MODE_DEBUG
