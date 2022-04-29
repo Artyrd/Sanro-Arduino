@@ -176,7 +176,7 @@ void loop() {
         Joystick.Button |= (state ? sensor_button[i] : SWITCH_BTN_NONE);
         Joystick.HAT |= (state ? sensor_hat[i] : 0);
         down_count[i] -= (bool)down_count[i];
-        if (state) break;
+        //if (state) break;
       }
       if (Joystick.HAT == 0) { 
         Joystick.HAT = SWITCH_HAT_CENTER;
